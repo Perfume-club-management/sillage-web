@@ -1,0 +1,84 @@
+version: "3.9"
+
+networks:
+  club_network:
+    name: club_network
+    driver: bridge
+
+volumes:
+  pg_data:
+
+services:
+  db:
+    image: postgres:16
+    container_name: club_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - club_network
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: club_api
+    restart: unless-stopped
+    environment:
+      API_ENV: ${API_ENV}
+      API_JWT_SECRET: ${API_JWT_SECRET}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      - db
+    expose:
+      - "8000"
+    networks:
+      - club_network
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+    container_name: club_web
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - club_network
+
+  flutter_web:
+    build:
+      context: ./flutter_app
+      dockerfile: Dockerfile
+      args:
+        PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+    container_name: club_flutter_web
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - club_network
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: club_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT}:80"
+    depends_on:
+      - api
+      - web
+      - flutter_web
+    networks:
+      - club_network
