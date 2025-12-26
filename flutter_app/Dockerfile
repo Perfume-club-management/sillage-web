@@ -1,13 +1,12 @@
-FROM ghcr.io/cirruslabs/flutter:stable AS builder
+FROM ghcr.io/cirruslabs/flutter:stable
 WORKDIR /app
 
+# Install dependencies only (source code will be mounted)
 COPY pubspec.yaml pubspec.lock* ./
+RUN flutter pub get
 
-COPY . .
-RUN flutter clean && flutter pub get
-RUN flutter build web --release --no-wasm-dry-run
-# RUN flutter build web --release
+# App code will be mounted as volume in docker-compose.yml
 
-FROM nginx:1.27-alpine
-COPY --from=builder /app/build/web /usr/share/nginx/html
 EXPOSE 80
+
+CMD ["flutter", "run", "-d", "web-server", "--web-port=80", "--web-hostname=0.0.0.0"]

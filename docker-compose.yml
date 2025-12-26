@@ -37,6 +37,8 @@ services:
       - db
     expose:
       - "8000"
+    volumes:
+      - ./api/app:/app/app
     networks:
       - club_network
 
@@ -50,6 +52,10 @@ services:
     restart: unless-stopped
     expose:
       - "80"
+    volumes:
+      - ./flutter_app:/app
+      - /app/.dart_tool
+      - /app/build
     networks:
       - club_network
 
