@@ -1,22 +1,41 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
+import '../features/home/presentation/pages.dart';
+import 'app_navigation.dart';
+import 'app_shell.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authControllerProvider);
+  final authNotifier = ref.watch(authControllerProvider.notifier);
 
   return GoRouter(
     initialLocation: '/login',
-    refreshListenable: GoRouterRefreshStream(ref.watch(authControllerProvider.notifier).stream),
+    refreshListenable: GoRouterRefreshStream(authNotifier.refreshStream),
     redirect: (context, state) {
-      final loggedIn = auth.isAuthenticated;
-      final goingToLogin = state.matchedLocation == '/login';
+      if (auth.isInitializing) return null;
 
-      if (!loggedIn && !goingToLogin) return '/login';
-      if (loggedIn && goingToLogin) return '/home';
+      final location = state.matchedLocation;
+      final loggedIn = auth.isAuthenticated;
+      final isLoginPage = location == '/login';
+
+      if (!loggedIn) {
+        return isLoginPage ? null : '/login';
+      }
+
+      if (isLoginPage || location == '/home') {
+        return defaultPathForRole(auth.role);
+      }
+
+      if (location.startsWith('/app') && !canAccessLocation(auth.role, location)) {
+        return defaultPathForRole(auth.role);
+      }
+
       return null;
     },
     routes: [
@@ -26,30 +45,67 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/home',
-        builder: (context, state) => const _HomeStub(),
+        redirect: (context, state) => defaultPathForRole(auth.role),
+      ),
+      ShellRoute(
+        builder: (context, state, child) => AppShell(
+          location: state.uri.path,
+          child: child,
+        ),
+        routes: [
+          GoRoute(
+            path: '/app/dashboard',
+            builder: (context, state) => const DashboardPage(),
+          ),
+          GoRoute(
+            path: '/app/notices',
+            builder: (context, state) => const NoticesPage(),
+          ),
+          GoRoute(
+            path: '/app/calendar',
+            builder: (context, state) => const CalendarPage(),
+          ),
+          GoRoute(
+            path: '/app/recruitment',
+            builder: (context, state) => const RecruitmentPage(),
+          ),
+          GoRoute(
+            path: '/app/club',
+            builder: (context, state) => const ClubManagementPage(),
+          ),
+          GoRoute(
+            path: '/app/members',
+            builder: (context, state) => const MembersPage(),
+          ),
+          GoRoute(
+            path: '/app/activities',
+            builder: (context, state) => const ActivitiesPage(),
+          ),
+          GoRoute(
+            path: '/app/inventory',
+            builder: (context, state) => const InventoryPage(),
+          ),
+          GoRoute(
+            path: '/app/finance',
+            builder: (context, state) => const FinancePage(),
+          ),
+          GoRoute(
+            path: '/app/my-page',
+            builder: (context, state) => const MyPage(),
+          ),
+        ],
       ),
     ],
   );
 });
 
-/// 지금은 stub. 로그인 성공 후 이동 확인용.
-class _HomeStub extends StatelessWidget {
-  const _HomeStub();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('HOME (stub)')),
-    );
-  }
-}
-
-/// Riverpod 상태 변화를 go_router가 감지하도록 하는 어댑터
 class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription<dynamic> _sub;
+
   GoRouterRefreshStream(Stream<dynamic> stream) {
     _sub = stream.listen((_) => notifyListeners());
   }
-  late final StreamSubscription<dynamic> _sub;
+
   @override
   void dispose() {
     _sub.cancel();

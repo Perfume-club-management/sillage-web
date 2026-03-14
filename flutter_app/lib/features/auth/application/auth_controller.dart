@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../data/auth_repository_mock.dart';
+
+import '../data/auth_repository_provider.dart';
 import '../domain/auth_repository.dart';
 import 'auth_state.dart';
 
@@ -12,17 +14,30 @@ final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _repo;
   final _streamController = StreamController<void>.broadcast();
-  Stream<void> get stream => _streamController.stream;
+
+  Stream<void> get refreshStream => _streamController.stream;
 
   AuthController(this._repo) : super(AuthState.initial());
 
   Future<void> bootstrap() async {
-    final ok = await _repo.hasValidSession();
-    if (ok) {
-      final role = await _repo.currentRole();
-      state = state.copyWith(isAuthenticated: true, role: role, errorMessage: null);
+    try {
+      final session = await _repo.restoreSession();
+      state = state.copyWith(
+        isInitializing: false,
+        isAuthenticated: session != null,
+        role: session?.role,
+        errorMessage: null,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isInitializing: false,
+        isAuthenticated: false,
+        role: null,
+        errorMessage: e.toString(),
+      );
+    } finally {
+      _streamController.add(null);
     }
-    _streamController.add(null);
   }
 
   Future<void> login({required String email, required String password}) async {
@@ -30,15 +45,22 @@ class AuthController extends StateNotifier<AuthState> {
     _streamController.add(null);
 
     try {
-      final tokens = await _repo.login(email: email, password: password);
+      final session = await _repo.login(email: email, password: password);
       state = state.copyWith(
+        isInitializing: false,
         isLoading: false,
         isAuthenticated: true,
-        role: tokens.role,
+        role: session.role,
         errorMessage: null,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, isAuthenticated: false, errorMessage: e.toString());
+      state = state.copyWith(
+        isInitializing: false,
+        isLoading: false,
+        isAuthenticated: false,
+        role: null,
+        errorMessage: e.toString(),
+      );
     }
 
     _streamController.add(null);
@@ -46,7 +68,7 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _repo.logout();
-    state = AuthState.initial();
+    state = AuthState.initial().copyWith(isInitializing: false);
     _streamController.add(null);
   }
 

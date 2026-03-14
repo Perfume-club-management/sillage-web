@@ -5,7 +5,6 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# System deps (psycopg2-binary는 보통 OK, 필요 시 libpq-dev로 전환)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
   && rm -rf /var/lib/apt/lists/*
@@ -13,8 +12,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY alembic.ini ./
+COPY alembic ./alembic
 COPY app ./app
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+
+RUN chmod +x ./docker-entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./docker-entrypoint.sh"]

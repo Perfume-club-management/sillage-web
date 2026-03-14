@@ -1,8 +1,7 @@
-import 'auth_tokens.dart';
+import 'auth_session.dart';
 
 abstract class AuthRepository {
-  Future<AuthTokens> login({required String email, required String password});
+  Future<AuthSession> login({required String email, required String password});
   Future<void> logout();
-  Future<bool> hasValidSession();
-  Future<String?> currentRole();
+  Future<AuthSession?> restoreSession();
 }

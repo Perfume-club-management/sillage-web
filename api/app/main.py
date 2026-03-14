@@ -1,11 +1,6 @@
-import os
 from fastapi import FastAPI
 
-app = FastAPI()
+from app.api.routes.health import router as health_router
 
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "env": os.getenv("API_ENV", "unknown"),
-    }
+app = FastAPI(title="Sillage API")
+app.include_router(health_router)
